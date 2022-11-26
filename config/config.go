@@ -2,24 +2,27 @@ package config
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/defaults"
-	"gopkg.in/ini.v1"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/aws/aws-sdk-go/aws/defaults"
+	"gopkg.in/ini.v1"
 )
 
 // Config is this tool's configuration
 type Config struct {
-	AppIDURI                    string
-	AzureTenantID               string
+	Subdomain                   string
+	OneloginAppId               string
+	AwsAccountId                string
 	DefaultSessionDurationHours int
 	ChromeUserDataDir           string
 }
 
 const (
-	appIDURIKeyName                    = "app_id_uri"
-	azureTenantIDKeyName               = "azure_tenant_id"
+	subdomainKeyName                   = "subdomain"
+	oneloginAppIdKeyName               = "onelogin_app_id"
+	awsAccountIdKeyName                = "aws_account_id"
 	defaultSessionDurationHoursKeyName = "default_session_duration_hours"
 	chromeUserDataDirKeyName           = "chrome_user_data_dir"
 )
@@ -38,12 +41,17 @@ func NewConfig(profile string) (Config, error) {
 		return cfg, err
 	}
 
-	appIDURIKey, err := section.GetKey(appIDURIKeyName)
+	subdomainKey, err := section.GetKey(subdomainKeyName)
 	if err != nil {
 		return cfg, err
 	}
 
-	azureTenantIDKey, err := section.GetKey(azureTenantIDKeyName)
+	oneloginAppIdKey, err := section.GetKey(oneloginAppIdKeyName)
+	if err != nil {
+		return cfg, err
+	}
+
+	awsAccountIdKey, err := section.GetKey(awsAccountIdKeyName)
 	if err != nil {
 		return cfg, err
 	}
@@ -58,8 +66,9 @@ func NewConfig(profile string) (Config, error) {
 		return cfg, err
 	}
 
-	cfg.AppIDURI = appIDURIKey.Value()
-	cfg.AzureTenantID = azureTenantIDKey.Value()
+	cfg.Subdomain = subdomainKey.Value()
+	cfg.OneloginAppId = oneloginAppIdKey.Value()
+	cfg.AwsAccountId = awsAccountIdKey.Value()
 	defaultSessionDurationHours, err := strconv.Atoi(defaultSessionDurationHoursKey.Value())
 	if err != nil {
 		return cfg, err
@@ -79,8 +88,9 @@ func Save(cfg Config, profile string) error {
 
 	section := f.Section(sectionName(profile))
 
-	section.Key(appIDURIKeyName).SetValue(cfg.AppIDURI)
-	section.Key(azureTenantIDKeyName).SetValue(cfg.AzureTenantID)
+	section.Key(subdomainKeyName).SetValue(cfg.Subdomain)
+	section.Key(oneloginAppIdKeyName).SetValue(cfg.OneloginAppId)
+	section.Key(awsAccountIdKeyName).SetValue(cfg.AwsAccountId)
 	section.Key(defaultSessionDurationHoursKeyName).SetValue(strconv.Itoa(cfg.DefaultSessionDurationHours))
 	section.Key(chromeUserDataDirKeyName).SetValue(cfg.ChromeUserDataDir)
 

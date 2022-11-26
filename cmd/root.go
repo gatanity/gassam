@@ -3,18 +3,20 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/cybozu/assam/aws"
-	"github.com/cybozu/assam/config"
-	"github.com/cybozu/assam/defaults"
-	"github.com/cybozu/assam/idp"
-	"github.com/cybozu/assam/prompt"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strconv"
 	"syscall"
+
+	"gatanity/assam/aws"
+	"gatanity/assam/config"
+	"gatanity/assam/defaults"
+	"gatanity/assam/idp"
+	"gatanity/assam/prompt"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 // goreleaser embed variables by ldflags
@@ -62,18 +64,13 @@ func newRootCmd() *cobra.Command {
 				return errors.Wrap(err, "please run `assam --configure` at the first time")
 			}
 
-			request, err := aws.CreateSAMLRequest(cfg.AppIDURI)
-			if err != nil {
-				return err
-			}
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			handleSignal(cancel)
 
-			azure := idp.NewAzure(request, cfg.AzureTenantID)
-			base64Response, err := azure.Authenticate(ctx, cfg.ChromeUserDataDir)
+			onelogin := idp.NewOnelogin(cfg.Subdomain, cfg.OneloginAppId)
+			base64Response, err := onelogin.Authenticate(ctx, cfg.ChromeUserDataDir)
 			if err != nil {
 				return err
 			}
@@ -83,7 +80,7 @@ func newRootCmd() *cobra.Command {
 				return err
 			}
 
-			roleArn, principalArn, err := aws.ExtractRoleArnAndPrincipalArn(*response, roleName)
+			roleArn, principalArn, err := aws.ExtractRoleArnAndPrincipalArn(*response, roleName, cfg.AwsAccountId)
 			if err != nil {
 				return err
 			}
@@ -122,22 +119,32 @@ func configureSettings(profile string) error {
 		cfg = config.Config{}
 	}
 
-	// Azure Tenant ID
-	var azureTenantIDOptions prompt.Options
-	if cfg.AzureTenantID != "" {
-		azureTenantIDOptions.Default = cfg.AzureTenantID
+	// OneLogin subdomain
+	var SubdomainOptions prompt.Options
+	if cfg.Subdomain != "" {
+		SubdomainOptions.Default = cfg.Subdomain
 	}
-	cfg.AzureTenantID, err = p.AskString("Azure Tenant ID", &azureTenantIDOptions)
+	cfg.Subdomain, err = p.AskString("Subdomain", &SubdomainOptions)
 	if err != nil {
 		return err
 	}
 
-	// App ID URI
-	var appIDURIOptions prompt.Options
-	if cfg.AppIDURI != "" {
-		appIDURIOptions.Default = cfg.AppIDURI
+	// App ID
+	var OneloginAppIdOptions prompt.Options
+	if cfg.OneloginAppId != "" {
+		OneloginAppIdOptions.Default = cfg.OneloginAppId
 	}
-	cfg.AppIDURI, err = p.AskString("App ID URI", &appIDURIOptions)
+	cfg.OneloginAppId, err = p.AskString("OneLogin App ID for AWS", &OneloginAppIdOptions)
+	if err != nil {
+		return err
+	}
+
+	// AWS Account ID
+	var AwsAccountIdOptions prompt.Options
+	if cfg.AwsAccountId != "" {
+		AwsAccountIdOptions.Default = cfg.AwsAccountId
+	}
+	cfg.AwsAccountId, err = p.AskString("AWS Account ID", &AwsAccountIdOptions)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,6 @@
 package main
 
-import "github.com/cybozu/assam/cmd"
+import "gatanity/assam/cmd"
 
 func main() {
 	cmd.Execute()

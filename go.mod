@@ -1,4 +1,4 @@
-module github.com/cybozu/assam
+module gatanity/assam
 
 go 1.19
 
@@ -6,7 +6,6 @@ require (
 	github.com/aws/aws-sdk-go v1.44.134
 	github.com/chromedp/cdproto v0.0.0-20221108233440-fad8339618ab
 	github.com/chromedp/chromedp v0.8.6
-	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
