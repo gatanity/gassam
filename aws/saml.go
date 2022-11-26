@@ -8,12 +8,11 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/google/uuid"
-	"strings"
-	"time"
 )
 
 const (
@@ -49,43 +48,6 @@ type AttributeValue struct {
 	Value string `xml:",innerxml"`
 }
 
-// CreateSAMLRequest creates the Base64 encoded SAML authentication request XML compressed by Deflate.
-func CreateSAMLRequest(appIDURI string) (string, error) {
-	// https://docs.microsoft.com/en-us/azure/active-directory/develop/single-sign-on-saml-protocol
-	// ID must not begin with a number, so a common strategy is to prepend a string like "id" to the string
-	// representation of a GUID.
-	// See https://www.w3.org/TR/xmlschema-2/#ID
-	xml := `
-<samlp:AuthnRequest
-  AssertionConsumerServiceURL="%s"
-  ID="id_%s"
-  IssueInstant="%s"
-  ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
-  Version="2.0"
-  xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol">
-  <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">%s</saml:Issuer>
-  <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" />
-</samlp:AuthnRequest>
-`
-
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return "", err
-	}
-
-	instant := time.Now().Format(time.RFC3339)
-	request := fmt.Sprintf(xml, EndpointURL, id, instant, appIDURI)
-
-	deflated, err := deflate(request)
-	if err != nil {
-		return "", err
-	}
-
-	encoded := base64.StdEncoding.EncodeToString(deflated.Bytes())
-
-	return encoded, nil
-}
-
 // ParseSAMLResponse parses base64 encoded response to SAMLResponse structure
 func ParseSAMLResponse(base64Response string) (*SAMLResponse, error) {
 	responseData, err := base64.StdEncoding.DecodeString(base64Response)
@@ -103,7 +65,7 @@ func ParseSAMLResponse(base64Response string) (*SAMLResponse, error) {
 }
 
 // ExtractRoleArnAndPrincipalArn extracts role ARN and principal ARN from SAML response
-func ExtractRoleArnAndPrincipalArn(samlResponse SAMLResponse, roleName string) (string, string, error) {
+func ExtractRoleArnAndPrincipalArn(samlResponse SAMLResponse, roleName string, accountId string) (string, string, error) {
 	for _, attr := range samlResponse.Assertion.AttributeStatement.Attributes {
 		if attr.Name != roleAttributeName {
 			continue
@@ -113,7 +75,7 @@ func ExtractRoleArnAndPrincipalArn(samlResponse SAMLResponse, roleName string) (
 			s := strings.Split(v.Value, ",")
 			roleArn := s[0]
 			principalArn := s[1]
-			if roleName != "" && strings.Split(roleArn, "/")[1] != roleName {
+			if roleName != "" && strings.Split(roleArn, "/")[1] != roleName || !strings.Contains(roleArn, accountId) {
 				continue
 			}
 			return roleArn, principalArn, nil
